@@ -1,14 +1,18 @@
 # Sentiment Analyzer NLP - FastAPI Backend
 
-A lightweight, high-performance REST API built with [FastAPI](https://fastapi.tiangolo.com/) that serves a pre-trained scikit-learn Machine Learning pipeline (`TF-IDF Vectorizer` + `Logistic Regression`) for sentiment analysis.
+A lightweight, high-performance REST API built with [FastAPI](https://fastapi.tiangolo.com/) that serves both:
+- **V2 (Primary Production)**: Fine-tuned RoBERTa Transformer model (`FacebookAI/roberta-base`) on TweetEval sentiment for 3-class classification (`negative`, `neutral`, `positive`).
+- **V1 (Historical Baseline)**: Pre-trained scikit-learn pipeline (`TF-IDF Vectorizer` + `Logistic Regression`) on IMDb reviews for binary classification (`negative`, `positive`).
 
 ---
 
 ## Features
 
-- **Efficient Startup Model Loading**: The model is loaded into memory once on application startup using FastAPI's `lifespan` handler, ensuring zero model-loading overhead during incoming API requests.
+- **Efficient Startup Model Loading**: Both models are loaded into memory once on application startup using FastAPI's `lifespan` handler, ensuring zero model-loading overhead during incoming API requests.
 - **Strict Input Validation**: Validates requests using Pydantic, instantly rejecting empty or whitespace-only inputs with informative error messages.
-- **Standardized Inference**: Emits predictions (`positive` / `negative`) along with a confidence percentage rounded to two decimal places.
+- **Standardized Inference**:
+  - `POST /predict/v2` (Primary): Emits 3-class sentiment predictions (`positive` / `negative` / `neutral`), class probabilities, and confidence score.
+  - `POST /predict` (Baseline): Emits binary predictions (`positive` / `negative`) along with a confidence percentage.
 - **CORS Configured**: Pre-configured to allow cross-origin requests from the Next.js frontend running locally at `http://localhost:3000`.
 - **Automated Interactive Docs**: Swagger UI documentation is available out of the box at `/docs`.
 
@@ -122,9 +126,41 @@ curl -X GET http://127.0.0.1:8000/health
 
 ---
 
-### 2. Sentiment Prediction: `POST /predict`
+### 2. V2 Primary Sentiment Prediction: `POST /predict/v2`
 
-Analyzes the sentiment of a text review.
+Analyzes the sentiment using the fine-tuned RoBERTa Transformer model on TweetEval (3-class: `negative`, `neutral`, `positive`).
+
+#### Request Body Schema:
+```json
+{
+  "text": "string (non-empty)"
+}
+```
+
+#### Successful Request:
+```bash
+curl -X POST http://127.0.0.1:8000/predict/v2 \
+  -H "Content-Type: application/json" \
+  -d '{"text": "I absolutely loved this movie!"}'
+```
+
+#### Response (`200 OK`):
+```json
+{
+  "text": "I absolutely loved this movie!",
+  "sentiment": "positive",
+  "confidence": 99.61,
+  "negative_probability": 0.12,
+  "neutral_probability": 0.27,
+  "positive_probability": 99.61
+}
+```
+
+---
+
+### 3. V1 Classical Baseline Prediction: `POST /predict`
+
+Analyzes the sentiment using the baseline scikit-learn pipeline (TF-IDF + Logistic Regression).
 
 #### Request Body Schema:
 ```json

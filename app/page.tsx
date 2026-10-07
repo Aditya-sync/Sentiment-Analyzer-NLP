@@ -94,7 +94,7 @@ export default function HomePage() {
         <section className="text-center space-y-4 pt-2 pb-2">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-subtle px-3 py-1 text-[11px] font-mono font-medium text-slate-300 shadow-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-            <span>NLP • TEXT CLASSIFICATION</span>
+            <span>ROBERTA V2 • 3-CLASS TRANSFORMER</span>
           </div>
 
           <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl md:text-5xl">
@@ -102,7 +102,7 @@ export default function HomePage() {
           </h1>
 
           <p className="mx-auto max-w-2xl text-xs sm:text-sm text-slate-400 leading-relaxed">
-            Analyze text using a machine-learning sentiment classifier and instantly see its predicted sentiment and confidence.
+            Analyze text using a fine-tuned RoBERTa Transformer model on TweetEval and instantly see its predicted 3-class sentiment and confidence.
           </p>
 
           <div className="pt-1 flex items-center justify-center gap-2">
@@ -203,10 +203,10 @@ export default function HomePage() {
                 02
               </span>
               <h4 className="mt-2 text-sm font-semibold text-white">
-                NLP model analyzes it
+                RoBERTa Transformer analyzes it
               </h4>
               <p className="mt-1 text-xs text-slate-400 leading-relaxed">
-                The classifier extracts token features, scores polarity weights, and assesses overall tone.
+                The fine-tuned RoBERTa model processes subword tokens through self-attention layers to capture deep contextual semantics.
               </p>
             </div>
 
@@ -215,10 +215,10 @@ export default function HomePage() {
                 03
               </span>
               <h4 className="mt-2 text-sm font-semibold text-white">
-                View sentiment &amp; confidence
+                3-class sentiment &amp; confidence
               </h4>
               <p className="mt-1 text-xs text-slate-400 leading-relaxed">
-                Inspect classification results alongside statistical confidence scores and token counts.
+                Outputs positive, neutral, or negative classifications alongside softmax probability distributions.
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export default function HomePage() {
           {/* Technology Stack with Clean Frontend / Backend Distinction */}
           <div className="border-t border-border/80 pt-6">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
-              Technology Stack
+              Technology Stack &amp; Model Architecture
             </h4>
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Frontend Card */}
@@ -261,11 +261,11 @@ export default function HomePage() {
                   <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-violet-400" />
                     <span className="text-xs font-semibold text-white">
-                      Backend (FastAPI Integration)
+                      Backend (FastAPI &amp; RoBERTa V2)
                     </span>
                   </div>
-                  <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400 border border-border">
-                    Planned Endpoint
+                  <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
+                    Live
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -276,10 +276,24 @@ export default function HomePage() {
                     Python
                   </span>
                   <span className="rounded-md border border-border bg-surface px-2.5 py-1 text-slate-300">
-                    scikit-learn
+                    PyTorch
+                  </span>
+                  <span className="rounded-md border border-border bg-surface px-2.5 py-1 text-slate-300">
+                    RoBERTa V2
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Architecture Evolution Note */}
+            <div className="mt-4 rounded-xl border border-border/80 bg-surface/50 p-4 text-xs text-slate-400 space-y-1">
+              <span className="font-semibold text-slate-300">Project Evolution:</span>
+              <p>
+                <strong className="text-slate-300">V2 (Production):</strong> Fine-tuned RoBERTa Transformer on TweetEval (3-class: negative, neutral, positive) served locally via FastAPI.
+              </p>
+              <p>
+                <strong className="text-slate-300">V1 (Baseline):</strong> Classical TF-IDF + Logistic Regression binary classifier on IMDb preserved as a benchmark.
+              </p>
             </div>
           </div>
         </section>

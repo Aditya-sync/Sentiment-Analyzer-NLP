@@ -1,12 +1,16 @@
 """
 FastAPI Backend for Sentiment Analyzer NLP
 
-This backend serves the pre-trained scikit-learn sentiment pipeline (TF-IDF + Logistic Regression).
-The model is loaded once on startup and handles prediction requests via a REST API.
+This backend serves:
+1. V1 (Historical Baseline): Pre-trained scikit-learn classical NLP pipeline (TF-IDF + Logistic Regression) on IMDb reviews.
+2. V2 (Current Production Model): Fine-tuned RoBERTa Transformer model (FacebookAI/roberta-base) on TweetEval sentiment (3-class: negative / neutral / positive).
+
+Both models are loaded once on startup via the application lifespan context manager.
 """
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+import sys
 from typing import Any, Optional
 
 import joblib
@@ -18,48 +22,83 @@ from pydantic import BaseModel, Field, field_validator
 # 1. Path & Model Storage Configuration
 # ============================================================================
 
-# Resolve the absolute path to the pre-trained ML model
+# Resolve directory paths
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = (BASE_DIR.parent / "ml" / "models" / "sentiment_pipeline.pkl").resolve()
+PROJECT_ROOT = BASE_DIR.parent
 
-# Global variable to hold the loaded pipeline in memory
+# V1 Classical model path
+MODEL_PATH = (PROJECT_ROOT / "ml" / "models" / "sentiment_pipeline.pkl").resolve()
+
+# V2 Transformer model path
+V2_MODEL_PATH = PROJECT_ROOT / "ml_transformer" / "models" / "roberta-tweeteval"
+
+# Ensure PROJECT_ROOT is on sys.path for importing ml_transformer modules
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from ml_transformer.src.test_model import (
+    load_inference_pipeline,
+    predict_sentiment as predict_v2_sentiment,
+)
+
+# Global variables for model references in memory
 ml_model: Optional[Any] = None
+v2_model: Optional[Any] = None
+v2_tokenizer: Optional[Any] = None
+v2_model_loaded: bool = False
 
 
 # ============================================================================
-# 2. Application Lifespan (Load Model ONCE at Startup)
+# 2. Application Lifespan (Load Models ONCE at Startup)
 # ============================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager:
-    - Runs ONCE when the FastAPI server starts: loads the trained ML model into memory.
+    - Runs ONCE when the FastAPI server starts: loads V1 and V2 models into memory.
     - Yields control to handle incoming requests.
     - Runs cleanup when the server shuts down.
     """
-    global ml_model
-    print(f"[*] Starting FastAPI server...")
-    print(f"[*] Loading sentiment model from: {MODEL_PATH}")
+    global ml_model, v2_model, v2_tokenizer, v2_model_loaded
+    print("[*] Starting FastAPI server...")
 
+    # --- Load V1 Classical Model ---
+    print(f"[*] Loading V1 sentiment model from: {MODEL_PATH}")
     if not MODEL_PATH.exists():
-        error_msg = f"Model file not found at: {MODEL_PATH}"
+        error_msg = f"V1 Model file not found at: {MODEL_PATH}"
         print(f"[!] ERROR: {error_msg}")
         raise FileNotFoundError(error_msg)
 
     try:
         # Load the scikit-learn pipeline (TF-IDF + LogisticRegression)
         ml_model = joblib.load(MODEL_PATH)
-        print("[+] Model loaded successfully and ready for inference!")
+        print("[+] V1 Classical model loaded successfully and ready for inference!")
     except Exception as exc:
-        print(f"[!] Failed to load model: {exc}")
+        print(f"[!] Failed to load V1 model: {exc}")
         raise exc
+
+    # --- Load V2 Transformer Model ---
+    print(f"[*] Loading V2 RoBERTa model from: {V2_MODEL_PATH}")
+    try:
+        v2_model, v2_tokenizer, _ = load_inference_pipeline(V2_MODEL_PATH)
+        v2_model_loaded = True
+        print("[+] V2 RoBERTa model loaded successfully and ready for inference!")
+    except Exception as exc:
+        print(f"[!] WARNING: Failed to load V2 RoBERTa model: {exc}")
+        print("[!] V1 will remain operational, but V2 endpoints will be unavailable.")
+        v2_model = None
+        v2_tokenizer = None
+        v2_model_loaded = False
 
     yield  # Application handles incoming requests while yielded
 
     # Clean up on shutdown
     print("[*] Shutting down FastAPI server and releasing model resources...")
     ml_model = None
+    v2_model = None
+    v2_tokenizer = None
+    v2_model_loaded = False
 
 
 # ============================================================================
@@ -68,8 +107,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Sentiment Analyzer NLP API",
-    description="REST API for classifying review sentiment using a trained scikit-learn NLP pipeline.",
-    version="1.0.0",
+    description="REST API for classifying sentiment using Classical NLP (V1) and Transformer (V2) pipelines.",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -94,7 +133,7 @@ class PredictRequest(BaseModel):
     """Request schema for sentiment prediction."""
     text: str = Field(
         ...,
-        description="The text review to analyze",
+        description="The text to analyze",
         examples=["I absolutely loved this movie!"]
     )
 
@@ -108,16 +147,27 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    """Response schema for sentiment prediction."""
+    """Response schema for V1 classical sentiment prediction."""
     text: str
     sentiment: str
     confidence: float
+
+
+class PredictV2Response(BaseModel):
+    """Response schema for V2 Transformer sentiment prediction."""
+    text: str
+    sentiment: str
+    confidence: float
+    negative_probability: float
+    neutral_probability: float
+    positive_probability: float
 
 
 class HealthResponse(BaseModel):
     """Response schema for API health check."""
     status: str
     model_loaded: bool
+    v2_model_loaded: bool
 
 
 # ============================================================================
@@ -134,7 +184,9 @@ async def root():
     return {
         "message": "Sentiment Analyzer NLP API is running.",
         "documentation": "/docs",
-        "health_check": "/health"
+        "health_check": "/health",
+        "v1_endpoint": "/predict",
+        "v2_endpoint": "/predict/v2",
     }
 
 
@@ -147,30 +199,32 @@ async def root():
 async def health_check():
     """
     Returns the operational status of the service and indicates
-    whether the ML pipeline has been successfully loaded into memory.
+    whether both ML pipelines have been loaded into memory.
     """
     return HealthResponse(
         status="healthy",
-        model_loaded=(ml_model is not None)
+        model_loaded=(ml_model is not None),
+        v2_model_loaded=v2_model_loaded,
     )
 
 
 @app.post(
     "/predict",
     response_model=PredictResponse,
-    tags=["Sentiment Analysis"],
-    summary="Predict Sentiment of a Text Review"
+    tags=["Sentiment Analysis (V1 - Classical Baseline)"],
+    summary="Predict Sentiment using V1 Classical Pipeline (Baseline)"
 )
 async def predict_sentiment(request: PredictRequest):
     """
+    [Baseline / Historical Endpoint]
     Classifies the sentiment of the provided text into 'positive' or 'negative'
-    along with a confidence score (percentage rounded to 2 decimal places).
+    using the scikit-learn pipeline (TF-IDF + Logistic Regression).
     """
-    # Guard: Ensure model is loaded
+    # Guard: Ensure V1 model is loaded
     if ml_model is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The ML model is not loaded. Please check server logs."
+            detail="The V1 ML model is not loaded. Please check server logs."
         )
 
     try:
@@ -199,5 +253,58 @@ async def predict_sentiment(request: PredictRequest):
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred during model inference: {str(exc)}"
+            detail=f"An error occurred during V1 model inference: {str(exc)}"
+        )
+
+
+@app.post(
+    "/predict/v2",
+    response_model=PredictV2Response,
+    tags=["Sentiment Analysis (V2 - Transformer Production)"],
+    summary="Predict Sentiment using V2 RoBERTa Transformer Pipeline (Primary)"
+)
+async def predict_sentiment_v2(request: PredictRequest):
+    """
+    [Primary Production Endpoint]
+    Classifies the sentiment of the provided text into 'negative', 'neutral', or 'positive'
+    using the fine-tuned RoBERTa Transformer model, returning individual class probabilities.
+    """
+    # Guard: Ensure V2 model is loaded
+    if not v2_model_loaded or v2_model is None or v2_tokenizer is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The V2 Transformer model is not loaded. Please check server logs."
+        )
+
+    try:
+        # Run forward pass inference with real model logits and softmax
+        result = predict_v2_sentiment(request.text, v2_model, v2_tokenizer)
+
+        # Convert probabilities to percentages rounded to 2 decimal places
+        neg_pct = round(result["negative_prob"] * 100, 2)
+        neu_pct = round(result["neutral_prob"] * 100, 2)
+        pos_pct = round(result["positive_prob"] * 100, 2)
+
+        # Confidence is the probability percentage of the predicted class
+        probs_by_class = {
+            "negative": neg_pct,
+            "neutral": neu_pct,
+            "positive": pos_pct,
+        }
+        sentiment = result["predicted_class"]
+        confidence = probs_by_class.get(sentiment, round(max(neg_pct, neu_pct, pos_pct), 2))
+
+        return PredictV2Response(
+            text=request.text,
+            sentiment=sentiment,
+            confidence=confidence,
+            negative_probability=neg_pct,
+            neutral_probability=neu_pct,
+            positive_probability=pos_pct,
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred during V2 model inference: {str(exc)}"
         )
