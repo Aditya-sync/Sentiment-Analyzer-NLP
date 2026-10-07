@@ -1,0 +1,19 @@
+# Transformer V2 Pipeline Requirements
+# Fully verified and tested on Python 3.13
+
+# Deep Learning Framework (CPU wheel installed for local environment; GPU compatible)
+torch>=2.2.0
+torchvision>=0.17.0
+accelerate>=0.29.0
+
+# Hugging Face Ecosystem
+transformers>=4.40.0
+datasets>=2.19.0
+evaluate>=0.4.0
+
+# Data Processing & Visualization (already in project environment)
+scikit-learn>=1.4.0
+pandas>=2.2.0
+numpy>=1.26.0
+matplotlib>=3.8.0
+seaborn>=0.13.0

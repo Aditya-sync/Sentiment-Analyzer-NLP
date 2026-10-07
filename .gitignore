@@ -1,0 +1,114 @@
+# ==============================================================================
+# .gitignore for Sentiment Analyzer NLP (Classical NLP + Transformer Pipeline)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Virtual Environments
+# ------------------------------------------------------------------------------
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# ------------------------------------------------------------------------------
+# 2. Python Bytecode & Interpreter Caches
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# ------------------------------------------------------------------------------
+# 3. Node.js & Next.js Build Artifacts
+# ------------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+.turbo/
+tsconfig.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------------------------------------------
+# 4. Large Datasets & Archives
+# ------------------------------------------------------------------------------
+# Raw IMDb archives & extracted folders (e.g. 462MB dataset.gz)
+dataset.gz/
+dataset.gz
+aclImdb/
+**/aclImdb/
+*.gz
+*.tar
+*.zip
+
+# Generated / Extracted Dataset Files (CSVs, TSVs, Parquets)
+ml/data/*.csv
+ml/data/*.tsv
+ml/data/*.parquet
+!ml/data/.gitkeep
+
+# Transformer local datasets & caches
+ml_transformer/data/*
+!ml_transformer/data/.gitkeep
+
+# ------------------------------------------------------------------------------
+# 5. Trained Models & Heavy Binary Weights
+# ------------------------------------------------------------------------------
+# Classical ML pickled pipelines (*.pkl, *.joblib)
+*.pkl
+*.joblib
+ml/models/*.pkl
+ml/models/*.joblib
+!ml/models/.gitkeep
+
+# Transformer Weights, Checkpoints & Safetensors
+ml_transformer/models/*
+!ml_transformer/models/.gitkeep
+checkpoint-*/
+**/checkpoint-*/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# ------------------------------------------------------------------------------
+# 6. Training Outputs, Evaluation Runs & Hugging Face Cache
+# ------------------------------------------------------------------------------
+ml_transformer/outputs/*
+!ml_transformer/outputs/.gitkeep
+runs/
+wandb/
+.cache/
+**/.cache/
+huggingface/
+*.log
+
+# ------------------------------------------------------------------------------
+# 7. Environment Variables & Secret Files
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ------------------------------------------------------------------------------
+# 8. Editor & OS Artifacts
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
