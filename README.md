@@ -172,7 +172,7 @@ Sentiment-Analyzer-NLP/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/Sentiment-Analyzer-NLP.git
+git clone https://github.com/Aditya-sync/Sentiment-Analyzer-NLP.git
 cd Sentiment-Analyzer-NLP
 ```
 
